@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name        Audio Device Selector
+// @name        Youtube Audio Device Selector
 // @namespace   https://github.com/DoKM/
 // @match       https://www.youtube.com/watch*
 // @match       https://m.youtube.com/watch*
-// @homepageURL 
+// @homepageURL https://github.com/DoKM/youtube-volume-selector
 // @grant       none
 // @version     1.0
 // @author      DoKM
