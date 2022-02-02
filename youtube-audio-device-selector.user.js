@@ -7,6 +7,7 @@
 // @grant       none
 // @version     1.0
 // @author      DoKM
+// @license     MIT
 // @description Audio Device Selector for youtube
 // ==/UserScript==
 
