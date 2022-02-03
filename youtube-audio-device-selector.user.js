@@ -13,6 +13,8 @@
 
 (async function () {
 
+  let dropDownBoxOld = undefined
+
   async function init() {
     addGlobalStyle(`/* Dropdown Button */
         .dropbtn {
@@ -104,6 +106,9 @@
   }
 
   function createMenu() {
+    if(dropDownBoxOld != undefined){
+      dropDownBoxOld.remove()
+    }
     const infoBox = getInfoBox()
     const dropDownBox = document.createElement("div")
     dropDownBox.classList.add("dropdown")
@@ -135,6 +140,10 @@
     dropDownBox.appendChild(dropDown)
     infoBox.appendChild(dropDownBox)
 
+  
+    dropDownBoxOld = dropDownBox;
+    
+
     return dropDown;
   }
 
@@ -160,11 +169,9 @@
     head.appendChild(style);
   }
 
-  let interval = setInterval(() => {
-    if (getInfoBox != undefined) {
-      clearInterval(interval)
-      setTimeout(init(), 500)
-
-    }
-  }, 500)
+  window.onload = () => {
+    window.addEventListener("yt-navigate-finish", () => {
+        setTimeout(() => {
+          init();
+        }, 200)})}
 })();
