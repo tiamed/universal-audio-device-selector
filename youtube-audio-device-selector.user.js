@@ -5,7 +5,7 @@
 // @match       https://m.youtube.com/watch*
 // @homepageURL https://github.com/DoKM/youtube-volume-selector
 // @grant       none
-// @version     1.0
+// @version     1.1
 // @author      DoKM
 // @license     MIT
 // @description Audio Device Selector for youtube
@@ -16,6 +16,16 @@
   let dropDownBoxOld = undefined
 
   async function init() {
+
+
+
+  if (window.trustedTypes && window.trustedTypes.createPolicy) {
+    window.trustedTypes.createPolicy('default', {
+      createHTML: string => string,
+      createScriptURL: string => string,
+      createScript: string => string,
+    })
+  };
     addGlobalStyle(`/* Dropdown Button */
         .dropbtn {
           background-color: #ffffff00;
@@ -25,18 +35,18 @@
           border: none;
           cursor: pointer;
         }
-        
+
         /* Dropdown button on hover & focus */
         .dropbtn:hover, .dropbtn:focus {
           background-color: #ffffff13;
         }
-        
+
         /* The container <div> - needed to position the dropdown content */
         .dropdown {
           position: relative;
           display: inline-block;
         }
-        
+
         /* Dropdown Content (Hidden by Default) */
         .dropdown-content {
           display: none;
@@ -46,7 +56,7 @@
           box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
           z-index: 301;
         }
-        
+
         /* Links inside the dropdown */
         .dropdown-content div {
           color: white;
@@ -55,10 +65,10 @@
           display: block;
           z-index: 301;
         }
-        
+
         /* Change color of dropdown links on hover */
         .dropdown-content div:hover {background-color: #282828}
-        
+
         /* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
         .show {display:block;}`);
 
@@ -84,8 +94,8 @@
 
     let tempDevices = await navigator.mediaDevices.enumerateDevices()
     let outputDevices = await gotDevices(tempDevices)
-    
-  
+
+
     //now callback will show device names and deviceId.
 
     const menu = createMenu()
@@ -140,9 +150,9 @@
     dropDownBox.appendChild(dropDown)
     infoBox.appendChild(dropDownBox)
 
-  
+
     dropDownBoxOld = dropDownBox;
-    
+
 
     return dropDown;
   }
