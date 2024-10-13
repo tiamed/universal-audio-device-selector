@@ -3,9 +3,9 @@
 // @namespace   https://github.com/DoKM/
 // @match       https://www.youtube.com/watch*
 // @match       https://m.youtube.com/watch*
-// @homepageURL https://github.com/DoKM/youtube-volume-selector
+// @homepageURL https://github.com/DoKM/youtube-audio-device-selector
 // @grant       none
-// @version     1.1
+// @version     1.2
 // @author      DoKM
 // @license     MIT
 // @description Audio Device Selector for youtube
@@ -98,7 +98,7 @@
 
     //now callback will show device names and deviceId.
 
-    const menu = createMenu()
+    const menu = await createMenu()
     const v = document.getElementsByTagName("video")[0]
 
     createMenuOptions(menu, outputDevices, v)
@@ -115,11 +115,11 @@
     })
   }
 
-  function createMenu() {
+  async function createMenu() {
     if(dropDownBoxOld != undefined){
       dropDownBoxOld.remove()
     }
-    const infoBox = getInfoBox()
+    const infoBox = await getInfoBox()
     const dropDownBox = document.createElement("div")
     dropDownBox.classList.add("dropdown")
 
@@ -157,14 +157,23 @@
     return dropDown;
   }
 
-  function getInfoBox() {
-    const infoElements = document.querySelectorAll("#info");
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  async function getInfoBox() {
+
+
     let validInfoBox
-    infoElements.forEach(element => {
-      if (element.tagName == "DIV" && element.className == 'style-scope ytd-watch-flexy') {
-        validInfoBox = element
+    while(validInfoBox == undefined){
+      const infoElements = document.querySelectorAll("#info");
+      infoElements.forEach(element => {
+        if (element.tagName == "DIV" && element.className == 'style-scope ytd-watch-flexy') {
+          validInfoBox = element
+        }
+      })
+      if(validInfoBox == undefined){
+        await sleep(2000)
       }
-    })
+    }
 
     return validInfoBox
   }
