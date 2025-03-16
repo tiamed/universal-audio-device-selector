@@ -1,12 +1,17 @@
 // ==UserScript==
 // @name        Universal Audio Device Selector
+// @name:zh-cn  音频输出切换器
+// @name:ja     ユニバーサル音声切替器
 // @namespace   Violentmonkey Scripts
 // @match       *://*/*
 // @grant       none
 // @version     1.0
 // @author      tiamed
+// @license     MIT
 // @homepageURL https://github.com/tiamed/universal-audio-device-selector
-// @description Universal audio output device selector
+// @description Allows you to select audio output device on any sites (except iframe)
+// @description:zh-cn   可在任意网站切换音视频的音频输出设备（iframe除外）
+// @description:ja     「あらゆるウェブサイトで音声出力デバイスの選択を可能にするスクリプト ※iframe内のコンテンツは除外」
 // @run-at      document-end
 // ==/UserScript==
 
