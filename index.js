@@ -5,7 +5,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       *://*/*
 // @grant       none
-// @version     1.0
+// @version     1.1
 // @author      tiamed
 // @license     MIT
 // @homepageURL https://github.com/tiamed/universal-audio-device-selector
@@ -13,154 +13,228 @@
 // @description:zh-cn   可在任意网站切换音视频的音频输出设备（iframe除外）
 // @description:ja     「あらゆるウェブサイトで音声出力デバイスの選択を可能にするスクリプト ※iframe内のコンテンツは除外」
 // @run-at      document-end
+// @downloadURL https://update.greasyfork.org/scripts/529985/Universal%20Audio%20Device%20Selector.user.js
+// @updateURL https://update.greasyfork.org/scripts/529985/Universal%20Audio%20Device%20Selector.meta.js
 // ==/UserScript==
 
 (function() {
     'use strict';
+    if (window.self !== window.top) return;
+
+    const STORAGE_KEY = 'audioDeviceSettings';
+    const UI_STYLE = {
+        button: {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            background: '#444',
+            color: '#fff',
+            padding: '12px 15px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            zIndex: 999999,
+            fontSize: '18px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            transition: 'all 0.2s',
+            userSelect: 'none',
+            WebkitUserSelect: 'none'
+        },
+        menu: {
+            position: 'fixed',
+            bottom: '60px',
+            right: '20px',
+            background: '#333',
+            color: '#fff',
+            padding: '10px',
+            borderRadius: '5px',
+            zIndex: 999999,
+            display: 'none',
+            maxHeight: '60vh',
+            overflowY: 'auto',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            minWidth: '200px',
+            userSelect: 'none',
+            WebkitUserSelect: 'none'
+        },
+        item: {
+            activeBg: '#444',
+            defaultBg: 'transparent'
+        }
+    };
 
     let devices = [];
-    let currentDevice;
-    const menu = document.createElement('div');
+    let currentDevice = null;
     let isInitialized = false;
-    let isMenuVisible = false;
+    let observer;
 
-    // 菜单样式
-    Object.assign(menu.style, {
-        position: 'fixed',
-        bottom: '60px',
-        right: '20px',
-        background: '#333',
-        color: 'white',
-        padding: '10px',
-        borderRadius: '5px',
-        zIndex: 999999,
-        display: 'none',
-        maxHeight: '60vh',
-        overflowY: 'auto',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-        minWidth: '200px'
-    });
-
-    async function initDevices() {
-        try {
-            // 只在首次点击时请求权限
-            if (!isInitialized) {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                stream.getTracks().forEach(track => track.stop());
-                isInitialized = true;
+    // 存储管理
+    const storage = {
+        get() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')[location.hostname];
+            } catch {
+                return null;
             }
+        },
+        set(deviceId) {
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            data[location.hostname] = deviceId;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+    };
+
+    // 主入口
+    async function main() {
+        const { button, menu } = createUI();
+        document.body.append(button, menu);
+
+        // 自动应用已有设置
+        const hasSetting = await tryAutoApply();
+        updateButtonState(button, hasSetting);
+
+        setupMutationObserver();
+        setupEventListeners(button, menu);
+    }
+
+    // 创建UI元素
+    function createUI() {
+        const button = document.createElement('div');
+        button.innerHTML = '🔊';
+        Object.assign(button.style, UI_STYLE.button);
+
+        const menu = document.createElement('div');
+        Object.assign(menu.style, UI_STYLE.menu);
+
+        return { button, menu };
+    }
+
+    // 尝试自动应用设置
+    async function tryAutoApply() {
+        const savedId = storage.get();
+        if (!savedId) return false;
+
+        try {
+            await initDevices(true);
             await updateDeviceList();
+            currentDevice = devices.find(d => d.deviceId === savedId);
+            if (currentDevice) {
+                await applyToAllMedia();
+                return true;
+            }
+        } catch(e) {
+            console.warn('Auto apply failed:', e);
+        }
+        return false;
+    }
+
+    // 设备初始化
+    async function initDevices(silent = false) {
+        if (isInitialized) return true;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+            isInitialized = true;
             return true;
         } catch(e) {
-            console.error('Device access error:', e);
+            if (!silent) console.error('Permission required:', e);
             return false;
         }
     }
 
+    // 更新设备列表
     async function updateDeviceList() {
         devices = (await navigator.mediaDevices.enumerateDevices())
             .filter(d => d.kind === 'audiooutput' && d.deviceId !== 'default');
-
-        const saved = localStorage.getItem('audioDevice');
-        currentDevice = devices.find(d => d.deviceId === saved) || devices[0];
     }
 
-    function createDeviceList() {
-        menu.innerHTML = `
-            <div style="margin-bottom:10px;font-weight:bold;padding:0 5px">音频输出设备</div>
-            ${devices.map(d => `
-                <div class="device-item"
-                    data-device-id="${d.deviceId}"
-                    style="padding:8px 12px;
-                        cursor:pointer;
-                        background:${d.deviceId === currentDevice?.deviceId ? '#444' : 'transparent'};
-                        border-radius:4px;
-                        margin:2px 0;
-                        transition:background 0.2s;">
-                    ${d.label}
-                </div>
-            `).join('')}
-        `;
-
-        menu.querySelectorAll('.device-item').forEach(item => {
-            item.addEventListener('click', async () => {
-                const deviceId = item.dataset.deviceId;
-                currentDevice = devices.find(d => d.deviceId === deviceId);
-                localStorage.setItem('audioDevice', deviceId);
-                await updateMediaElements();
-                createDeviceList();
-                toggleMenu();
-            });
-        });
-    }
-
-    async function updateMediaElements() {
+    // 应用到所有媒体元素
+    async function applyToAllMedia() {
         const mediaElements = document.querySelectorAll('video, audio');
         for (const media of mediaElements) {
-            if (currentDevice && media.setSinkId) {
+            if (currentDevice?.deviceId && media.setSinkId) {
                 try {
                     await media.setSinkId(currentDevice.deviceId);
                 } catch(e) {
-                    console.error('Failed to set sink:', e);
+                    console.warn('Switch failed:', media.src, e);
                 }
             }
         }
     }
 
-    function toggleMenu() {
-        isMenuVisible = !isMenuVisible;
-        menu.style.display = isMenuVisible ? 'block' : 'none';
+    // 更新按钮状态
+    function updateButtonState(button, isActive) {
+        button.style.background = isActive ? '#28a745' : UI_STYLE.button.background;
     }
 
-    // 主入口
-    async function main() {
-        if (window.self !== window.top) return;
+    // 设置DOM监听
+    function setupMutationObserver() {
+        observer = new MutationObserver(mutations => {
+            const hasMedia = mutations.some(mutation =>
+                [...mutation.addedNodes].some(n =>
+                    n.nodeType === Node.ELEMENT_NODE &&
+                    (n.tagName === 'VIDEO' || n.tagName === 'AUDIO')
+                )
+            );
+            if (hasMedia) applyToAllMedia();
+        });
+        observer.observe(document, {
+            subtree: true,
+            childList: true
+        });
+    }
 
-        // 添加控制按钮
-        const btn = document.createElement('div');
-        btn.innerHTML = '🔊';
-        Object.assign(btn.style, {
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            background: '#444',
-            color: 'white',
-            padding: '12px 15px',
-            borderRadius: '50%',
-            cursor: 'pointer',
-            zIndex: '999999',
-            fontSize: '18px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-            transition: 'transform 0.2s'
+    // 设置事件监听
+    function setupEventListeners(button, menu) {
+        // 按钮点击
+        button.addEventListener('click', async () => {
+            if (!isInitialized && !await initDevices()) return;
+
+            await updateDeviceList();
+            refreshDeviceList(menu, button);
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
         });
 
-        btn.addEventListener('mouseover', () => btn.style.transform = 'scale(1.1)');
-        btn.addEventListener('mouseout', () => btn.style.transform = 'scale(1)');
-
-        btn.addEventListener('click', async () => {
-            if (!isInitialized) {
-                const success = await initDevices();
-                if (!success) return;
+        // 全局点击关闭菜单
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && e.target !== button) {
+                menu.style.display = 'none';
             }
-            if (!devices.length) await updateDeviceList();
-            createDeviceList();
-            toggleMenu();
         });
-
-        document.body.appendChild(btn);
-        document.body.appendChild(menu);
-
-        new MutationObserver(updateMediaElements)
-            .observe(document, { subtree: true, childList: true });
     }
 
-    // 点击外部关闭菜单
-    document.addEventListener('click', (e) => {
-        if (!menu.contains(e.target) && !e.target.isEqualNode(btn)) {
-            menu.style.display = 'none';
-            isMenuVisible = false;
-        }
-    });
+    // 刷新设备列表
+    function refreshDeviceList(menu, button) {
+        menu.innerHTML = `
+            <div style="margin-bottom:10px; font-weight: bold; padding: 0 5px">
+                ${location.hostname} 的设备
+            </div>
+            ${devices.map(d => `
+                <div class="device-item"
+                    data-id="${d.deviceId}"
+                    style="padding: 8px 12px;
+                        cursor: pointer;
+                        background: ${d.deviceId === currentDevice?.deviceId ? UI_STYLE.item.activeBg : UI_STYLE.item.defaultBg};
+                        border-radius: 4px;
+                        margin: 2px 0;
+                        transition: background 0.2s;">
+                    ${d.label}
+                </div>
+            `).join('')}
+        `;
+
+        // 绑定设备点击事件
+        menu.querySelectorAll('.device-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                currentDevice = devices.find(d => d.deviceId === item.dataset.id);
+                storage.set(currentDevice.deviceId);
+                await applyToAllMedia();
+                refreshDeviceList(menu, button); // 立即刷新样式
+                updateButtonState(button, true);
+                menu.style.display = 'none';
+            });
+        });
+    }
 
     window.addEventListener('load', main);
 })();
