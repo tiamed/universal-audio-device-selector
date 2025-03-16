@@ -16,9 +16,10 @@
     let devices = [];
     let currentDevice;
     const menu = document.createElement('div');
+    let isInitialized = false;
     let isMenuVisible = false;
 
-    // 初始化样式
+    // 菜单样式
     Object.assign(menu.style, {
         position: 'fixed',
         bottom: '60px',
@@ -37,11 +38,17 @@
 
     async function initDevices() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop());
+            // 只在首次点击时请求权限
+            if (!isInitialized) {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+                isInitialized = true;
+            }
             await updateDeviceList();
+            return true;
         } catch(e) {
             console.error('Device access error:', e);
+            return false;
         }
     }
 
@@ -70,15 +77,14 @@
             `).join('')}
         `;
 
-        // 添加点击事件监听器
         menu.querySelectorAll('.device-item').forEach(item => {
             item.addEventListener('click', async () => {
                 const deviceId = item.dataset.deviceId;
                 currentDevice = devices.find(d => d.deviceId === deviceId);
                 localStorage.setItem('audioDevice', deviceId);
                 await updateMediaElements();
-                createDeviceList(); // 更新列表高亮状态
-                toggleMenu(); // 选择后自动关闭菜单
+                createDeviceList();
+                toggleMenu();
             });
         });
     }
@@ -103,40 +109,44 @@
 
     // 主入口
     async function main() {
-        await initDevices();
-        createDeviceList();
+        if (window.self !== window.top) return;
 
         // 添加控制按钮
         const btn = document.createElement('div');
         btn.innerHTML = '🔊';
-        btn.style = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #444;
-            color: white;
-            padding: 12px 15px;
-            border-radius: 50%;
-            cursor: pointer;
-            z-index: 999999;
-            font-size: 18px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            transition: transform 0.2s;
-        `;
+        Object.assign(btn.style, {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            background: '#444',
+            color: 'white',
+            padding: '12px 15px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            zIndex: '999999',
+            fontSize: '18px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            transition: 'transform 0.2s'
+        });
 
         btn.addEventListener('mouseover', () => btn.style.transform = 'scale(1.1)');
         btn.addEventListener('mouseout', () => btn.style.transform = 'scale(1)');
-        btn.addEventListener('click', toggleMenu);
+
+        btn.addEventListener('click', async () => {
+            if (!isInitialized) {
+                const success = await initDevices();
+                if (!success) return;
+            }
+            if (!devices.length) await updateDeviceList();
+            createDeviceList();
+            toggleMenu();
+        });
 
         document.body.appendChild(btn);
         document.body.appendChild(menu);
 
-        // 监听动态添加的媒体元素
         new MutationObserver(updateMediaElements)
             .observe(document, { subtree: true, childList: true });
-
-        // 初始更新
-        await updateMediaElements();
     }
 
     // 点击外部关闭菜单
