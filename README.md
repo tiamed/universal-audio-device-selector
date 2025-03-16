@@ -1,4 +1,4 @@
-# Youtube Audio Device Selector
+# Universal Audio Device Selector
 
 allows you to pick a audio device to use using the drop down menu
 
