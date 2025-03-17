@@ -5,7 +5,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       *://*/*
 // @grant       none
-// @version     1.1
+// @version     1.2
 // @author      tiamed
 // @license     MIT
 // @homepageURL https://github.com/tiamed/universal-audio-device-selector
@@ -85,7 +85,10 @@
 
     // 主入口
     async function main() {
-        const { button, menu } = createUI();
+        const {
+            button,
+            menu
+        } = createUI();
         document.body.append(button, menu);
 
         // 自动应用已有设置
@@ -99,13 +102,16 @@
     // 创建UI元素
     function createUI() {
         const button = document.createElement('div');
-        button.innerHTML = '🔊';
+        button.textContent = '🔊';
         Object.assign(button.style, UI_STYLE.button);
 
         const menu = document.createElement('div');
         Object.assign(menu.style, UI_STYLE.menu);
 
-        return { button, menu };
+        return {
+            button,
+            menu
+        };
     }
 
     // 尝试自动应用设置
@@ -121,7 +127,7 @@
                 await applyToAllMedia();
                 return true;
             }
-        } catch(e) {
+        } catch (e) {
             console.warn('Auto apply failed:', e);
         }
         return false;
@@ -132,11 +138,13 @@
         if (isInitialized) return true;
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
             stream.getTracks().forEach(t => t.stop());
             isInitialized = true;
             return true;
-        } catch(e) {
+        } catch (e) {
             if (!silent) console.error('Permission required:', e);
             return false;
         }
@@ -155,7 +163,7 @@
             if (currentDevice?.deviceId && media.setSinkId) {
                 try {
                     await media.setSinkId(currentDevice.deviceId);
-                } catch(e) {
+                } catch (e) {
                     console.warn('Switch failed:', media.src, e);
                 }
             }
@@ -170,12 +178,10 @@
     // 设置DOM监听
     function setupMutationObserver() {
         observer = new MutationObserver(mutations => {
-            const hasMedia = mutations.some(mutation =>
-                [...mutation.addedNodes].some(n =>
-                    n.nodeType === Node.ELEMENT_NODE &&
-                    (n.tagName === 'VIDEO' || n.tagName === 'AUDIO')
-                )
-            );
+            const hasMedia = mutations.some(mutation => [...mutation.addedNodes].some(n =>
+                n.nodeType === Node.ELEMENT_NODE &&
+                (n.tagName === 'VIDEO' || n.tagName === 'AUDIO')
+            ));
             if (hasMedia) applyToAllMedia();
         });
         observer.observe(document, {
@@ -205,34 +211,45 @@
 
     // 刷新设备列表
     function refreshDeviceList(menu, button) {
-        menu.innerHTML = `
-            <div style="margin-bottom:10px; font-weight: bold; padding: 0 5px">
-                ${location.hostname} 的设备
-            </div>
-            ${devices.map(d => `
-                <div class="device-item"
-                    data-id="${d.deviceId}"
-                    style="padding: 8px 12px;
-                        cursor: pointer;
-                        background: ${d.deviceId === currentDevice?.deviceId ? UI_STYLE.item.activeBg : UI_STYLE.item.defaultBg};
-                        border-radius: 4px;
-                        margin: 2px 0;
-                        transition: background 0.2s;">
-                    ${d.label}
-                </div>
-            `).join('')}
-        `;
+        // 清空原有内容
+        while (menu.firstChild) {
+            menu.removeChild(menu.firstChild);
+        }
 
-        // 绑定设备点击事件
-        menu.querySelectorAll('.device-item').forEach(item => {
-            item.addEventListener('click', async () => {
-                currentDevice = devices.find(d => d.deviceId === item.dataset.id);
+        // 创建标题
+        const title = document.createElement("div");
+        title.textContent = `${location.hostname} 的设备`;
+        title.style.cssText = "margin-bottom:10px; font-weight: bold; padding: 0 5px";
+        menu.appendChild(title);
+
+        // 动态创建设备项
+        devices.forEach(d => {
+            const item = document.createElement("div");
+            item.className = "device-item";
+            item.dataset.id = d.deviceId;
+            item.textContent = d.label; // 使用 textContent 防止 XSS
+
+            // 设置内联样式
+            item.style.cssText = `
+        padding: 8px 12px;
+        cursor: pointer;
+        background: ${d.deviceId === currentDevice?.deviceId ? UI_STYLE.item.activeBg : UI_STYLE.item.defaultBg};
+        border-radius: 4px;
+        margin: 2px 0;
+        transition: background 0.2s;
+    `;
+
+            // 绑定点击事件
+            item.addEventListener("click", async () => {
+                currentDevice = devices.find(device => device.deviceId === d.deviceId);
                 storage.set(currentDevice.deviceId);
                 await applyToAllMedia();
-                refreshDeviceList(menu, button); // 立即刷新样式
+                refreshDeviceList(menu, button);
                 updateButtonState(button, true);
                 menu.style.display = 'none';
             });
+
+            menu.appendChild(item);
         });
     }
 
